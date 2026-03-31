@@ -1,44 +1,56 @@
 services:
   app:
     build: .
-    working_dir: /app
-    volumes:
-      - ./src:/app
     ports:
-      - "3000:3000"
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: user
-      DB_PASSWORD: password
-      DB_NAME: mydb
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      - "${APP_PORT}:3000"
+    volumes:
+      - ./:/app
+      - /app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - nestnet
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mydb
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
       retries: 5
+    networks:
+      - nestnet
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
+      timeout: 3s
       retries: 5
+    networks:
+      - nestnet
 
 volumes:
-  pgdata:
+  postgres_data:
+
+networks:
+  nestnet:
+    driver: bridge
